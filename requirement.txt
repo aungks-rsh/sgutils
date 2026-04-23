@@ -1,0 +1,7 @@
+i want to create a simple website, that help for little little thing in people of singapore.
+1. help generate random valid NRIC, FIN number, if there are any other types.
+2. and also help validate the NRiC/FIN format, if someone come to enter the value.
+3. date time converter from unix time integger to UTC time and local time. and also in reverse.
+and what are the other useful things that we can help build?
+like HDB estimate calculator?
+let's brain storm under this project.
