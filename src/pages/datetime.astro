@@ -1,0 +1,310 @@
+---
+import Layout from "../components/Layout.astro";
+import { SITE } from "../config/site";
+
+const title = "Singapore Datetime Converter — Unix, UTC, SGT — sgutils";
+const description =
+  "Convert between Unix timestamps (seconds or milliseconds), ISO 8601, UTC, Singapore time (SGT, UTC+8), and your local timezone. Runs entirely in your browser.";
+
+const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Singapore Datetime Converter",
+  url: pageUrl,
+  description,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Any",
+  browserRequirements: "Requires JavaScript",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "SGD" },
+  publisher: { "@type": "Organization", name: SITE.name, url: SITE.url },
+  inLanguage: "en-SG",
+};
+---
+
+<Layout title={title} description={description} jsonLd={jsonLd}>
+  <section class="hero">
+    <h1>Date / Time Converter</h1>
+    <p class="lede">
+      Convert between Unix timestamps, ISO 8601, UTC, Singapore time (SGT),
+      and your local timezone. Runs entirely in your browser.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>Input</h2>
+    <div class="field">
+      <label for="dt-input" class="label">Timestamp or date</label>
+      <input
+        id="dt-input"
+        class="mono"
+        type="text"
+        inputmode="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="1700000000, 2026-04-24 14:30:00, or 24/04/2026"
+      />
+    </div>
+    <div class="dt-actions">
+      <button id="dt-now" type="button" class="ghost">Use now</button>
+      <button id="dt-clear" type="button" class="ghost">Clear</button>
+    </div>
+    <p id="dt-error" class="dt-error" aria-live="polite"></p>
+    <p class="dt-hint">
+      Tip: dates without an explicit timezone are assumed to be
+      <strong>Singapore time (SGT, UTC+8)</strong>. Use <code>Z</code> or an
+      explicit offset (e.g. <code>+00:00</code>) to override.
+    </p>
+  </section>
+
+  <section class="card dt-results-card" id="dt-results-card" hidden>
+    <h2>Interpreted as</h2>
+    <dl class="dt-results">
+      <div class="dt-row">
+        <dt>Unix (seconds)</dt>
+        <dd>
+          <code id="dt-unix-s"></code>
+          <button type="button" class="ghost" data-copy="dt-unix-s">Copy</button>
+        </dd>
+      </div>
+      <div class="dt-row">
+        <dt>Unix (milliseconds)</dt>
+        <dd>
+          <code id="dt-unix-ms"></code>
+          <button type="button" class="ghost" data-copy="dt-unix-ms">Copy</button>
+        </dd>
+      </div>
+      <div class="dt-row">
+        <dt>UTC</dt>
+        <dd>
+          <code id="dt-utc"></code>
+          <button type="button" class="ghost" data-copy="dt-utc">Copy</button>
+        </dd>
+      </div>
+      <div class="dt-row">
+        <dt>Singapore (SGT, UTC+8)</dt>
+        <dd>
+          <code id="dt-sgt"></code>
+          <button type="button" class="ghost" data-copy="dt-sgt">Copy</button>
+        </dd>
+      </div>
+      <div class="dt-row" id="dt-local-row">
+        <dt>Local (<span id="dt-local-label"></span>)</dt>
+        <dd>
+          <code id="dt-local"></code>
+          <button type="button" class="ghost" data-copy="dt-local">Copy</button>
+        </dd>
+      </div>
+      <div class="dt-row">
+        <dt>ISO 8601</dt>
+        <dd>
+          <code id="dt-iso"></code>
+          <button type="button" class="ghost" data-copy="dt-iso">Copy</button>
+        </dd>
+      </div>
+      <div class="dt-row">
+        <dt>Relative</dt>
+        <dd><code id="dt-rel"></code></dd>
+      </div>
+    </dl>
+  </section>
+</Layout>
+
+<script>
+  import {
+    parseDatetime,
+    formatUtc,
+    formatSgt,
+    formatLocal,
+    formatIso,
+    formatRelative,
+    localTimezoneLabel,
+    localDiffersFromSgt,
+  } from "../lib/datetime";
+
+  const input = document.getElementById("dt-input") as HTMLInputElement;
+  const errorEl = document.getElementById("dt-error") as HTMLParagraphElement;
+  const resultsCard = document.getElementById("dt-results-card") as HTMLElement;
+  const localRow = document.getElementById("dt-local-row") as HTMLElement;
+  const localLabelEl = document.getElementById("dt-local-label") as HTMLElement;
+
+  const outputs = {
+    unixS: document.getElementById("dt-unix-s") as HTMLElement,
+    unixMs: document.getElementById("dt-unix-ms") as HTMLElement,
+    utc: document.getElementById("dt-utc") as HTMLElement,
+    sgt: document.getElementById("dt-sgt") as HTMLElement,
+    local: document.getElementById("dt-local") as HTMLElement,
+    iso: document.getElementById("dt-iso") as HTMLElement,
+    rel: document.getElementById("dt-rel") as HTMLElement,
+  };
+
+  const nowBtn = document.getElementById("dt-now") as HTMLButtonElement;
+  const clearBtn = document.getElementById("dt-clear") as HTMLButtonElement;
+
+  localLabelEl.textContent = localTimezoneLabel();
+
+  function render(ms: number) {
+    errorEl.textContent = "";
+    errorEl.classList.remove("visible");
+    resultsCard.hidden = false;
+
+    const unixSecRaw = ms / 1000;
+    const unixSec = Number.isInteger(unixSecRaw) ? unixSecRaw : +unixSecRaw.toFixed(3);
+    outputs.unixS.textContent = String(unixSec);
+    outputs.unixMs.textContent = String(ms);
+    outputs.utc.textContent = formatUtc(ms);
+    outputs.sgt.textContent = formatSgt(ms);
+    outputs.local.textContent = formatLocal(ms);
+    outputs.iso.textContent = formatIso(ms);
+    outputs.rel.textContent = formatRelative(ms);
+
+    localRow.hidden = !localDiffersFromSgt(ms);
+  }
+
+  function showError(message: string) {
+    errorEl.textContent = message;
+    errorEl.classList.add("visible");
+    resultsCard.hidden = true;
+  }
+
+  function update() {
+    const value = input.value;
+    if (!value.trim()) {
+      errorEl.textContent = "";
+      errorEl.classList.remove("visible");
+      resultsCard.hidden = true;
+      return;
+    }
+    const result = parseDatetime(value);
+    if (result.valid && result.ms !== undefined) {
+      render(result.ms);
+    } else {
+      showError(result.error ?? "Unrecognized format");
+    }
+  }
+
+  input.addEventListener("input", update);
+
+  nowBtn.addEventListener("click", () => {
+    input.value = String(Date.now());
+    update();
+    input.focus();
+  });
+
+  clearBtn.addEventListener("click", () => {
+    input.value = "";
+    update();
+    input.focus();
+  });
+
+  async function copyValue(targetId: string, btn: HTMLButtonElement) {
+    const el = document.getElementById(targetId);
+    if (!el?.textContent) return;
+    try {
+      await navigator.clipboard.writeText(el.textContent);
+      const prev = btn.textContent;
+      btn.textContent = "Copied";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = prev;
+        btn.classList.remove("copied");
+      }, 1200);
+    } catch {
+      btn.textContent = "Failed";
+    }
+  }
+
+  document.querySelectorAll<HTMLButtonElement>("button[data-copy]").forEach(
+    (btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.getAttribute("data-copy");
+        if (target) copyValue(target, btn);
+      });
+    },
+  );
+</script>
+
+<style>
+  .dt-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .dt-hint {
+    margin: 1rem 0 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .dt-hint code {
+    font-family: var(--mono);
+    background: var(--segmented-bg);
+    padding: 0 0.3rem;
+    border-radius: 4px;
+    font-size: 0.85em;
+  }
+
+  .dt-error {
+    margin: 0.75rem 0 0;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--err);
+    min-height: 1.3em;
+  }
+
+  .dt-error.visible::before {
+    content: "✗ ";
+  }
+
+  .dt-results {
+    margin: 0;
+    padding: 0;
+  }
+
+  .dt-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child {
+    border-bottom: none;
+  }
+
+  .dt-row dt {
+    font-size: 0.82rem;
+    color: var(--muted);
+    font-weight: 500;
+    margin: 0;
+  }
+
+  .dt-row dd {
+    margin: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .dt-row code {
+    font-family: var(--mono);
+    font-size: 0.98rem;
+    user-select: all;
+    word-break: break-all;
+  }
+
+  @media (min-width: 520px) {
+    .dt-row {
+      grid-template-columns: minmax(180px, auto) 1fr;
+      gap: 1rem;
+      align-items: center;
+    }
+    .dt-row dt {
+      text-align: left;
+    }
+  }
+</style>
