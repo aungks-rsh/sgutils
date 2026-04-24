@@ -57,6 +57,13 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
         } catch (e) {}
       })();
     </script>
+
+    <script
+      is:inline
+      defer
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+      data-cf-beacon='{"token": "4423dab5705042af8be99e08315d5207"}'
+    ></script>
   </head>
   <body>
     <header class="site-header">
