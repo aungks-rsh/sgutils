@@ -1,0 +1,609 @@
+---
+import Layout from "../components/Layout.astro";
+import { SITE } from "../config/site";
+
+const title = "Singapore HDB Resale Cost Calculator — sgutils";
+const description =
+  "Estimate the upfront cash and CPF needed to buy an HDB resale flat in Singapore. Compare HDB loan vs bank loan side-by-side. Runs entirely in your browser.";
+
+const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Singapore HDB Resale Cost Calculator",
+  url: pageUrl,
+  description,
+  applicationCategory: "FinanceApplication",
+  operatingSystem: "Any",
+  browserRequirements: "Requires JavaScript",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "SGD" },
+  publisher: { "@type": "Organization", name: SITE.name, url: SITE.url },
+  inLanguage: "en-SG",
+};
+---
+
+<Layout title={title} description={description} jsonLd={jsonLd}>
+  <section class="hero">
+    <h1>HDB Resale Cost Calculator</h1>
+    <p class="lede">
+      Estimate the upfront cash and CPF needed to buy an HDB resale flat. Toggle
+      between HDB loan and bank loan, or compare both. All maths runs in your
+      browser.
+    </p>
+  </section>
+
+  <section class="card" aria-labelledby="inputs-heading">
+    <h2 id="inputs-heading">Your purchase</h2>
+
+    <div class="field">
+      <label for="hdb-price" class="label">HDB resale price (SGD)</label>
+      <input
+        id="hdb-price"
+        type="number"
+        inputmode="numeric"
+        min="0"
+        step="1000"
+        placeholder="600000"
+        value="600000"
+      />
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="hdb-cpf" class="label">CPF OA available (optional)</label>
+        <input
+          id="hdb-cpf"
+          type="number"
+          inputmode="numeric"
+          min="0"
+          step="1000"
+          value="50000"
+        />
+      </div>
+      <div class="field">
+        <label for="hdb-age" class="label">Your age (optional)</label>
+        <input
+          id="hdb-age"
+          type="number"
+          inputmode="numeric"
+          min="21"
+          max="64"
+          step="1"
+          placeholder="35"
+        />
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="label">Loan type</span>
+      <div class="segmented" role="radiogroup" aria-label="Loan type">
+        <label>
+          <input type="radio" name="loanType" value="hdb" checked />
+          <span>HDB loan</span>
+        </label>
+        <label>
+          <input type="radio" name="loanType" value="bank" />
+          <span>Bank loan</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="field hdb-toggles">
+      <label class="checkbox">
+        <input type="checkbox" id="hdb-own-agent" checked />
+        <span>I'm using my own buyer's agent (1% fee)</span>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="hdb-show-both" />
+        <span>Show HDB loan and bank loan side-by-side</span>
+      </label>
+    </div>
+  </section>
+
+  <section class="card hdb-results-card" id="hdb-results-card">
+    <h2 id="results-heading">Upfront cost breakdown</h2>
+    <div id="hdb-results"></div>
+    <p class="disclaimer">
+      Estimates based on Singapore rules current at time of writing (BSD tiers,
+      75% LTV, $500 mortgage stamp cap). Legal, valuation, and fire insurance
+      shown as flat estimates — actual fees vary. CPF usage capped at items
+      that allow CPF (excludes mandatory cash, fire insurance, agent fee).
+      Always verify with HDB, your bank, and a conveyancing lawyer before
+      committing.
+    </p>
+  </section>
+
+  <section class="card" aria-labelledby="monthly-heading">
+    <h2 id="monthly-heading">Monthly repayment</h2>
+
+    <div class="row hdb-row-top">
+      <div class="field">
+        <label for="hdb-rate" class="label">Interest rate (% p.a.)</label>
+        <input
+          id="hdb-rate"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          max="20"
+          step="0.05"
+          value="2.6"
+        />
+      </div>
+      <div class="field">
+        <label for="hdb-tenure" class="label">Loan tenure (years)</label>
+        <input
+          id="hdb-tenure"
+          type="number"
+          inputmode="numeric"
+          min="1"
+          max="35"
+          step="1"
+          value="25"
+          aria-describedby="hdb-tenure-help"
+        />
+        <p id="hdb-tenure-help" class="hdb-help" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <div id="hdb-monthly"></div>
+
+    <p class="disclaimer">
+      Default rates: HDB loan 2.6%, bank loan 3.0% — adjust above for your
+      actual offer. Bank rates are typically variable; this calculation assumes
+      a flat rate over the full tenure.
+    </p>
+  </section>
+</Layout>
+
+<script>
+  import {
+    calcMortgage,
+    calcTenureLimits,
+    calculate,
+    defaultRateFor,
+    formatSgd,
+    type LoanType,
+  } from "../lib/hdb";
+
+  const priceInput = document.getElementById("hdb-price") as HTMLInputElement;
+  const cpfInput = document.getElementById("hdb-cpf") as HTMLInputElement;
+  const ageInput = document.getElementById("hdb-age") as HTMLInputElement;
+  const ownAgentInput = document.getElementById("hdb-own-agent") as HTMLInputElement;
+  const showBothInput = document.getElementById("hdb-show-both") as HTMLInputElement;
+  const rateInput = document.getElementById("hdb-rate") as HTMLInputElement;
+  const tenureInput = document.getElementById("hdb-tenure") as HTMLInputElement;
+  const loanTypeRadios = document.querySelectorAll<HTMLInputElement>(
+    'input[name="loanType"]',
+  );
+  const resultsEl = document.getElementById("hdb-results") as HTMLElement;
+  const monthlyEl = document.getElementById("hdb-monthly") as HTMLElement;
+  const tenureHelpEl = document.getElementById("hdb-tenure-help") as HTMLElement;
+
+  function currentLoanType(): LoanType {
+    const checked = Array.from(loanTypeRadios).find((r) => r.checked);
+    return (checked?.value as LoanType) ?? "hdb";
+  }
+
+  function readNumber(el: HTMLInputElement): number {
+    const v = el.value.trim();
+    if (!v) return 0;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function readOptionalNumber(el: HTMLInputElement): number | undefined {
+    const v = el.value.trim();
+    if (!v) return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  type Row = { label: string; value: string; sub?: string; emphasize?: boolean };
+
+  function rowsFor(loanType: LoanType): Row[] {
+    const cpfOaEntered = readNumber(cpfInput);
+    const r = calculate({
+      price: readNumber(priceInput),
+      cpfOa: cpfOaEntered,
+      age: readOptionalNumber(ageInput),
+      loanType,
+      buyerHasOwnAgent: ownAgentInput.checked,
+    });
+
+    const rows: Row[] = [];
+    rows.push({ label: "HDB price", value: formatSgd(r.price) });
+    rows.push({
+      label: "Loan amount (75% LTV)",
+      value: formatSgd(r.loanAmount),
+    });
+    rows.push({
+      label: "Cash down (25%)",
+      value: formatSgd(r.cashDown),
+      sub:
+        loanType === "bank"
+          ? `Min cash ${formatSgd(r.cashDownMinCash)} · CPF up to ${formatSgd(r.cashDownCpfPayable)}`
+          : `Up to ${formatSgd(r.cashDownCpfPayable)} can be CPF`,
+    });
+    rows.push({
+      label: "Buyer's Stamp Duty (BSD)",
+      value: formatSgd(r.bsd.total),
+      sub: bsdSub(r.bsd),
+    });
+    rows.push({ label: "Legal fee", value: formatSgd(r.legalFee) });
+    rows.push({ label: "Valuation fee", value: formatSgd(r.valuationFee) });
+    rows.push({ label: "Fire insurance", value: formatSgd(r.fireInsurance) });
+    rows.push({
+      label: "Mortgage stamp duty",
+      value: formatSgd(r.mortgageStampDuty),
+      sub: "0.4% of loan, capped at $500",
+    });
+    if (r.agentFee > 0) {
+      rows.push({ label: "Agent fee (1%)", value: formatSgd(r.agentFee) });
+    }
+    rows.push({
+      label: "Total cashdown",
+      value: formatSgd(r.totalCashdown),
+      emphasize: true,
+    });
+    if (r.cpfApplied > 0) {
+      const overflow = cpfOaEntered - r.cpfApplied;
+      let sub: string | undefined;
+      if (overflow > 0) {
+        sub = `${formatSgd(overflow)} of your OA can't be used (cash-only items below)`;
+      } else if (r.cpfEligibleTotal > r.cpfApplied) {
+        sub = `Up to ${formatSgd(r.cpfEligibleTotal)} of OA is eligible`;
+      }
+      rows.push({
+        label: "Less CPF OA used",
+        value: `−${formatSgd(r.cpfApplied)}`,
+        sub,
+      });
+    }
+    rows.push({
+      label: "Cash needed",
+      value: formatSgd(r.cashNeeded),
+      sub:
+        r.hardCashFloor > 0
+          ? `Hard cash floor ${formatSgd(r.hardCashFloor)}: ${[
+              r.cashDownMinCash > 0 ? `${formatSgd(r.cashDownMinCash)} min cash` : null,
+              `${formatSgd(r.fireInsurance)} fire insurance`,
+              r.agentFee > 0 ? `${formatSgd(r.agentFee)} agent fee` : null,
+            ]
+              .filter(Boolean)
+              .join(" + ")}`
+          : undefined,
+      emphasize: true,
+    });
+    return rows;
+  }
+
+  function bsdSub(b: ReturnType<typeof calculate>["bsd"]): string {
+    const parts: string[] = [];
+    if (b.tier1 > 0) parts.push(`1% ${formatSgd(b.tier1)}`);
+    if (b.tier2 > 0) parts.push(`2% ${formatSgd(b.tier2)}`);
+    if (b.tier3 > 0) parts.push(`3% ${formatSgd(b.tier3)}`);
+    if (b.tier4 > 0) parts.push(`4% ${formatSgd(b.tier4)}`);
+    if (b.tier5 > 0) parts.push(`5% ${formatSgd(b.tier5)}`);
+    if (b.tier6 > 0) parts.push(`6% ${formatSgd(b.tier6)}`);
+    return parts.join(" + ");
+  }
+
+  function renderRows(rows: Row[]): string {
+    return `<table class="hdb-table"><tbody>${rows
+      .map(
+        (r) => `
+          <tr class="${r.emphasize ? "emphasize" : ""}">
+            <th scope="row">${r.label}${r.sub ? `<span class="hdb-sub">${r.sub}</span>` : ""}</th>
+            <td>${r.value}</td>
+          </tr>`,
+      )
+      .join("")}</tbody></table>`;
+  }
+
+  function monthlyRowsFor(
+    loanType: LoanType,
+    override?: { rate?: number; years?: number },
+  ): Row[] {
+    const price = readNumber(priceInput);
+    const r = calculate({ price, loanType });
+    const rate = override?.rate ?? readNumber(rateInput);
+    const years = override?.years ?? readNumber(tenureInput);
+    const m = calcMortgage({
+      loanAmount: r.loanAmount,
+      annualRatePct: rate,
+      years,
+    });
+
+    if (m.months === 0 || r.loanAmount === 0) {
+      return [
+        { label: "Monthly payment", value: formatSgd(0), emphasize: true },
+      ];
+    }
+
+    return [
+      {
+        label: "Monthly payment",
+        value: `${formatSgd(m.monthlyPayment)} / mo`,
+        sub: `${rate.toFixed(2)}% p.a. over ${years} years on ${formatSgd(r.loanAmount)} loan`,
+        emphasize: true,
+      },
+      {
+        label: "First month split",
+        value: `${formatSgd(m.firstMonthPrincipal)} / ${formatSgd(m.firstMonthInterest)}`,
+        sub: "principal / interest — shifts toward principal over time",
+      },
+      {
+        label: `Total paid over ${years} years`,
+        value: formatSgd(m.totalPaid),
+      },
+      {
+        label: "Total interest",
+        value: formatSgd(m.totalInterest),
+      },
+    ];
+  }
+
+  function syncDefaultsFromLoanType() {
+    const lt = currentLoanType();
+    rateInput.value = String(defaultRateFor(lt));
+    const age = readOptionalNumber(ageInput);
+    const limits = calcTenureLimits(
+      typeof age === "number" && age > 0 && age < 65 ? Math.floor(age) : null,
+      lt,
+    );
+    tenureInput.value = String(limits.fullLtvMax);
+  }
+
+  function syncTenureFromAge() {
+    const lt = currentLoanType();
+    const age = readOptionalNumber(ageInput);
+    const limits = calcTenureLimits(
+      typeof age === "number" && age > 0 && age < 65 ? Math.floor(age) : null,
+      lt,
+    );
+    tenureInput.value = String(limits.fullLtvMax);
+  }
+
+  function updateTenureHelp() {
+    const lt = currentLoanType();
+    const ageRaw = readOptionalNumber(ageInput);
+    const age =
+      typeof ageRaw === "number" && ageRaw > 0 && ageRaw < 65
+        ? Math.floor(ageRaw)
+        : null;
+    const limits = calcTenureLimits(age, lt);
+    const tenure = readNumber(tenureInput);
+
+    let cls = "hdb-help";
+    let text: string;
+
+    if (tenure > limits.absoluteMax) {
+      cls = "hdb-help err";
+      text =
+        age !== null
+          ? `Exceeds max tenure for age ${age} (max ${limits.absoluteMax}y). Loan must end by age 65.`
+          : `Exceeds max tenure (cap ${limits.absoluteCap}y).`;
+    } else if (lt === "bank" && tenure > limits.fullLtvMax) {
+      cls = "hdb-help warn";
+      text = `Reduced LTV zone — bank will lend at 55% (not 75%) for tenure beyond ${limits.fullLtvMax}y${
+        age !== null ? ` at age ${age}` : ""
+      }.`;
+    } else {
+      text =
+        age !== null
+          ? lt === "bank"
+            ? `Max ${limits.absoluteMax}y for age ${age} · full LTV up to ${limits.fullLtvMax}y`
+            : `Max ${limits.absoluteMax}y for age ${age} (HDB loan stops at age 65)`
+          : lt === "bank"
+            ? `Cap ${limits.absoluteCap}y · full LTV up to ${limits.fullLtvCap}y · enter age above for personalised limit`
+            : `Cap ${limits.absoluteCap}y · enter age above for personalised limit`;
+    }
+
+    tenureHelpEl.className = cls;
+    tenureHelpEl.textContent = text;
+  }
+
+  function render() {
+    if (showBothInput.checked) {
+      const hdbRows = rowsFor("hdb");
+      const bankRows = rowsFor("bank");
+      resultsEl.innerHTML = `
+        <div class="hdb-compare">
+          <div class="hdb-col">
+            <h3>HDB loan</h3>
+            ${renderRows(hdbRows)}
+          </div>
+          <div class="hdb-col">
+            <h3>Bank loan</h3>
+            ${renderRows(bankRows)}
+          </div>
+        </div>`;
+      monthlyEl.innerHTML = `
+        <div class="hdb-compare">
+          <div class="hdb-col">
+            <h3>HDB loan @ ${defaultRateFor("hdb").toFixed(2)}%</h3>
+            ${renderRows(monthlyRowsFor("hdb", { rate: defaultRateFor("hdb"), years: 25 }))}
+          </div>
+          <div class="hdb-col">
+            <h3>Bank loan @ ${defaultRateFor("bank").toFixed(2)}%</h3>
+            ${renderRows(monthlyRowsFor("bank", { rate: defaultRateFor("bank"), years: 30 }))}
+          </div>
+        </div>`;
+    } else {
+      resultsEl.innerHTML = renderRows(rowsFor(currentLoanType()));
+      monthlyEl.innerHTML = renderRows(monthlyRowsFor(currentLoanType()));
+    }
+  }
+
+  function renderAll() {
+    updateTenureHelp();
+    render();
+  }
+
+  [priceInput, cpfInput, rateInput, tenureInput].forEach((el) =>
+    el.addEventListener("input", renderAll),
+  );
+  ageInput.addEventListener("input", () => {
+    syncTenureFromAge();
+    renderAll();
+  });
+  loanTypeRadios.forEach((r) =>
+    r.addEventListener("change", () => {
+      syncDefaultsFromLoanType();
+      renderAll();
+    }),
+  );
+  ownAgentInput.addEventListener("change", renderAll);
+  showBothInput.addEventListener("change", renderAll);
+
+  renderAll();
+</script>
+
+<style>
+  .hdb-toggles {
+    gap: 0.5rem;
+  }
+
+  .checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.92rem;
+    color: var(--text);
+    cursor: pointer;
+    padding: 0.35rem 0;
+  }
+
+  .checkbox input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+
+  input[type="number"] {
+    font-family: var(--mono);
+    font-size: 1rem;
+    padding: 0.65rem 0.75rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    width: 100%;
+    min-height: 44px;
+  }
+
+  input[type="number"]:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+  }
+
+  .hdb-row-top {
+    align-items: flex-start;
+  }
+
+  .hdb-help {
+    margin: 0.4rem 0 0;
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+
+  .hdb-help.warn {
+    color: #b06a00;
+  }
+
+  .hdb-help.err {
+    color: var(--err);
+  }
+
+  :root[data-theme="dark"] .hdb-help.warn {
+    color: #f0b357;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .hdb-help.warn {
+      color: #f0b357;
+    }
+  }
+</style>
+
+<style is:global>
+  .hdb-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .hdb-table th,
+  .hdb-table td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 2px solid var(--border);
+    vertical-align: baseline;
+    text-align: left;
+  }
+
+  .hdb-table th {
+    border-right: 2px solid var(--border);
+    width: 60%;
+  }
+
+  .hdb-table tr:last-child th,
+  .hdb-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .hdb-table th {
+    font-weight: 400;
+    font-size: 0.92rem;
+    color: var(--text);
+  }
+
+  .hdb-table td {
+    font-family: var(--mono);
+    font-size: 0.98rem;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .hdb-table tr.emphasize th,
+  .hdb-table tr.emphasize td {
+    font-weight: 600;
+    background: var(--segmented-bg);
+  }
+
+  .hdb-sub {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-weight: 400;
+    margin-top: 0.15rem;
+  }
+
+  .hdb-compare {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .hdb-col h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    color: var(--muted);
+    font-weight: 500;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+
+  @media (min-width: 600px) {
+    .hdb-compare {
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+  }
+</style>

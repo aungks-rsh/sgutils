@@ -15,4 +15,9 @@ export const UTILITIES: Utility[] = [
     label: "Date / Time",
     tagline: "Convert Unix, UTC, SGT, and local timestamps",
   },
+  {
+    slug: "/hdb",
+    label: "HDB Cost",
+    tagline: "Estimate upfront cash + CPF needed for an HDB resale flat",
+  },
 ];
