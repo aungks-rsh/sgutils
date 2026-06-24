@@ -314,6 +314,12 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
         font-weight: 500;
       }
 
+      /* The [hidden] attribute must win over display rules like `.row`
+         below, otherwise toggling `el.hidden = true` has no effect. */
+      [hidden] {
+        display: none !important;
+      }
+
       .row {
         display: flex;
         gap: 0.75rem;
@@ -325,7 +331,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
         margin-bottom: 0.9rem;
       }
 
-      select, input[type="text"] {
+      select, input[type="text"], input[type="number"] {
         font-family: var(--sans);
         font-size: 1rem;
         padding: 0.65rem 0.75rem;
