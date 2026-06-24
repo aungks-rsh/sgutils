@@ -1,0 +1,406 @@
+---
+import Layout from "../components/Layout.astro";
+import { SITE } from "../config/site";
+import {
+  UEN_FORMATS,
+  OTHER_PREFIXES,
+  OTHER_PREFIX_DESCRIPTIONS,
+  ENTITY_TYPE_CODES,
+} from "../lib/uen";
+
+const title = "Singapore UEN Generator & Validator — sgutils";
+const description =
+  "Generate and validate format-valid Singapore UEN (Unique Entity Number) test data for the three official formats. Runs entirely in your browser — private and fast.";
+
+const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Singapore UEN Generator & Validator",
+  url: pageUrl,
+  description,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Any",
+  browserRequirements: "Requires JavaScript",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "SGD" },
+  publisher: { "@type": "Organization", name: SITE.name, url: SITE.url },
+  inLanguage: "en-SG",
+};
+
+const entityCodeEntries = Object.entries(ENTITY_TYPE_CODES);
+---
+
+<Layout title={title} description={description} jsonLd={jsonLd}>
+  <section class="hero">
+    <h1>Singapore UEN Generator &amp; Validator</h1>
+    <p class="lede">
+      Generate and check format-valid Unique Entity Numbers across all three
+      official formats. Useful for testing business-onboarding forms — all
+      computation runs in your browser.
+    </p>
+  </section>
+
+  <section class="card" aria-labelledby="generate-heading">
+    <h2 id="generate-heading">Generate</h2>
+
+    <div class="field">
+      <span class="label">Format</span>
+      <div class="segmented" role="radiogroup" aria-label="UEN format">
+        <label>
+          <input type="radio" name="format" value="business" />
+          <span>Business</span>
+        </label>
+        <label>
+          <input type="radio" name="format" value="local" checked />
+          <span>Local company</span>
+        </label>
+        <label>
+          <input type="radio" name="format" value="other" />
+          <span>Other entity</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="row" id="year-row">
+      <div class="field">
+        <label for="year" class="label">Year <span class="hint">(optional)</span></label>
+        <input
+          id="year"
+          type="number"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="e.g. 2019 — random if blank"
+          min="1965"
+          max="2025"
+        />
+      </div>
+    </div>
+
+    <div class="row other-only" hidden>
+      <div class="field">
+        <label for="other-prefix" class="label">Prefix</label>
+        <select id="other-prefix">
+          <option value="">random</option>
+          {OTHER_PREFIXES.map((p) => (
+            <option value={p}>{p} — {OTHER_PREFIX_DESCRIPTIONS[p]}</option>
+          ))}
+        </select>
+      </div>
+      <div class="field">
+        <label for="entity-code" class="label">Entity type</label>
+        <select id="entity-code">
+          <option value="">random</option>
+          {entityCodeEntries.map(([code, name]) => (
+            <option value={code}>{code} — {name}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="count" class="label">How many</label>
+        <select id="count">
+          <option selected>1</option>
+          <option>5</option>
+          <option>10</option>
+          <option>20</option>
+          <option>50</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="generate-btn" class="primary" type="button">Generate</button>
+
+    <div class="results-header" hidden>
+      <span id="results-count"></span>
+      <button id="copy-all" class="ghost" type="button">Copy all</button>
+    </div>
+    <ul id="results" class="results" aria-live="polite"></ul>
+
+    <p class="disclaimer">
+      For testing and development only. These are <strong>not</strong> real
+      entities and must not be used to misrepresent any business. The trailing
+      check letter is a random placeholder, not a computed checksum (see below).
+    </p>
+  </section>
+
+  <section class="card" id="validate" aria-labelledby="validate-heading">
+    <h2 id="validate-heading">Validate</h2>
+    <div class="row">
+      <div class="field grow">
+        <label for="validate-input" class="label">UEN</label>
+        <input
+          id="validate-input"
+          type="text"
+          class="mono upper"
+          inputmode="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="e.g. 201912345K"
+          maxlength="10"
+        />
+      </div>
+      <div class="field">
+        <span class="label">&nbsp;</span>
+        <button id="validate-btn" class="primary" type="button">Check</button>
+      </div>
+    </div>
+    <p id="validate-summary" class="validate-result" aria-live="polite"></p>
+    <ul id="validate-checks" class="checks"></ul>
+  </section>
+
+  <section class="card" aria-labelledby="formats-heading">
+    <h2 id="formats-heading">The three UEN formats</h2>
+    <ul class="formats">
+      {Object.values(UEN_FORMATS).map((f) => (
+        <li>
+          <strong>{f.label}</strong>
+          <span class="formats-pattern">{f.pattern}</span>
+          <code>{f.example}</code>
+        </li>
+      ))}
+    </ul>
+    <p class="disclaimer">
+      ACRA does not publish the UEN check-letter algorithm, so this tool checks
+      <strong>structure only</strong> — a passing result does not mean a UEN is
+      real or registered. To look up a genuine entity, use the official
+      <a href="https://www.bizfile.gov.sg/" rel="nofollow noopener" target="_blank">ACRA BizFile</a>
+      directory.
+    </p>
+  </section>
+</Layout>
+
+<script>
+  import {
+    generateManyUen,
+    validateUen,
+    type GenerateOptions,
+    type OtherPrefix,
+    type UenFormat,
+  } from "../lib/uen";
+
+  const formatRadios = document.querySelectorAll<HTMLInputElement>(
+    'input[name="format"]',
+  );
+  const otherOnly = document.querySelector(".other-only") as HTMLDivElement;
+  const yearInput = document.getElementById("year") as HTMLInputElement;
+  const prefixSelect = document.getElementById("other-prefix") as HTMLSelectElement;
+  const entityCodeSelect = document.getElementById("entity-code") as HTMLSelectElement;
+  const countSelect = document.getElementById("count") as HTMLSelectElement;
+  const generateBtn = document.getElementById("generate-btn") as HTMLButtonElement;
+  const resultsList = document.getElementById("results") as HTMLUListElement;
+  const resultsHeader = document.querySelector(".results-header") as HTMLDivElement;
+  const resultsCountEl = document.getElementById("results-count") as HTMLSpanElement;
+  const copyAllBtn = document.getElementById("copy-all") as HTMLButtonElement;
+
+  const validateInput = document.getElementById("validate-input") as HTMLInputElement;
+  const validateBtn = document.getElementById("validate-btn") as HTMLButtonElement;
+  const validateSummary = document.getElementById("validate-summary") as HTMLParagraphElement;
+  const validateChecks = document.getElementById("validate-checks") as HTMLUListElement;
+
+  function currentFormat(): UenFormat {
+    const checked = Array.from(formatRadios).find((r) => r.checked);
+    return (checked?.value as UenFormat) ?? "local";
+  }
+
+  const yearRow = document.getElementById("year-row") as HTMLDivElement;
+
+  function syncFormatControls() {
+    const format = currentFormat();
+    // Year only belongs to the local-company format (it carries a full 4-digit
+    // year). "Business" has no year; "other" derives its era from the prefix.
+    otherOnly.hidden = format !== "other";
+    yearRow.hidden = format !== "local";
+  }
+
+  formatRadios.forEach((r) => r.addEventListener("change", syncFormatControls));
+  syncFormatControls();
+
+  async function copyText(text: string, btn: HTMLButtonElement) {
+    try {
+      await navigator.clipboard.writeText(text);
+      const prev = btn.textContent;
+      btn.textContent = "Copied";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = prev;
+        btn.classList.remove("copied");
+      }, 1200);
+    } catch {
+      btn.textContent = "Copy failed";
+    }
+  }
+
+  function renderResults(uens: string[]) {
+    resultsList.innerHTML = "";
+    for (const uen of uens) {
+      const li = document.createElement("li");
+      const code = document.createElement("code");
+      code.textContent = uen;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ghost";
+      btn.textContent = "Copy";
+      btn.addEventListener("click", () => copyText(uen, btn));
+      li.append(code, btn);
+      resultsList.append(li);
+    }
+    resultsHeader.hidden = uens.length === 0;
+    resultsCountEl.textContent =
+      uens.length === 1 ? "1 result" : `${uens.length} results`;
+  }
+
+  generateBtn.addEventListener("click", () => {
+    const format = currentFormat();
+    const opts: GenerateOptions = { format };
+
+    if (format === "local") {
+      const yearRaw = yearInput.value.trim();
+      if (yearRaw !== "") {
+        const year = Number.parseInt(yearRaw, 10);
+        if (Number.isInteger(year)) opts.year = year;
+      }
+    }
+    if (format === "other") {
+      if (prefixSelect.value) opts.prefix = prefixSelect.value as OtherPrefix;
+      if (entityCodeSelect.value) opts.entityCode = entityCodeSelect.value;
+    }
+
+    const count = Number.parseInt(countSelect.value, 10);
+    renderResults(generateManyUen(opts, count));
+  });
+
+  copyAllBtn.addEventListener("click", () => {
+    const text = Array.from(resultsList.querySelectorAll("code"))
+      .map((c) => c.textContent ?? "")
+      .join("\n");
+    if (text) copyText(text, copyAllBtn);
+  });
+
+  function runValidate() {
+    validateChecks.innerHTML = "";
+    const value = validateInput.value;
+    if (!value.trim()) {
+      validateSummary.textContent = "";
+      validateSummary.className = "validate-result";
+      return;
+    }
+    const result = validateUen(value);
+    if (result.valid) {
+      validateSummary.textContent = `✓ Valid structure — ${result.formatLabel}`;
+      validateSummary.className = "validate-result ok";
+    } else {
+      validateSummary.textContent = `✗ Invalid — ${result.reason}`;
+      validateSummary.className = "validate-result err";
+    }
+    for (const check of result.checks) {
+      const li = document.createElement("li");
+      li.className = `check check-${check.status}`;
+      const mark = check.status === "ok" ? "✓" : check.status === "fail" ? "✗" : "ⓘ";
+      li.textContent = `${mark} ${check.label}`;
+      validateChecks.append(li);
+    }
+  }
+
+  validateBtn.addEventListener("click", runValidate);
+  validateInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runValidate();
+  });
+</script>
+
+<style>
+  .hint {
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .results {
+    list-style: none;
+    padding: 0;
+    margin: 0.25rem 0 0;
+  }
+
+  .results li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--border);
+    gap: 0.5rem;
+  }
+
+  .results li:last-child { border-bottom: none; }
+
+  .results code {
+    font-family: var(--mono);
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+    user-select: all;
+  }
+
+  .validate-result {
+    margin: 0.75rem 0 0;
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    min-height: 1.5em;
+  }
+
+  .validate-result.ok { color: var(--ok); }
+  .validate-result.err { color: var(--err); }
+
+  .checks {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+  }
+
+  .checks .check {
+    font-size: 0.9rem;
+    padding: 0.2rem 0;
+    color: var(--muted);
+  }
+
+  .checks .check-ok { color: var(--ok); }
+  .checks .check-info { color: var(--muted); }
+  .checks .check-fail { color: var(--err); }
+
+  .formats {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .formats li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .formats li:last-child { border-bottom: none; }
+
+  .formats-pattern {
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .formats code {
+    font-family: var(--mono);
+    letter-spacing: 0.05em;
+    align-self: flex-start;
+  }
+</style>

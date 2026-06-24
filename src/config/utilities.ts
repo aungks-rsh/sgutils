@@ -20,4 +20,9 @@ export const UTILITIES: Utility[] = [
     label: "HDB Cost",
     tagline: "Estimate upfront cash + CPF needed for an HDB resale flat",
   },
+  {
+    slug: "/uen",
+    label: "UEN",
+    tagline: "Generate and validate Singapore Unique Entity Numbers",
+  },
 ];
