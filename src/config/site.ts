@@ -1,5 +1,5 @@
 export const SITE = {
-  url: "https://sgutils.sg",
+  url: "https://sgutils.com",
   name: "sgutils",
   title: "sgutils — Singapore utilities",
   description:

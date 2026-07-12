@@ -3,6 +3,6 @@ import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 
 export default defineConfig({
-  site: "https://sgutils.sg",
+  site: "https://sgutils.com",
   integrations: [sitemap()],
 });

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://sgutils.sg/sitemap-index.xml
+Sitemap: https://sgutils.com/sitemap-index.xml
