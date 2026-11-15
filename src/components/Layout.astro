@@ -200,6 +200,8 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
         padding: 1rem 1.25rem;
         border-bottom: 1px solid var(--border);
         background: var(--panel);
+        flex-wrap: wrap;
+        gap: 0.5rem;
       }
 
       .brand {
@@ -214,6 +216,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        flex-wrap: wrap;
       }
 
       .nav-link {
@@ -433,6 +436,108 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
         border-color: var(--ok);
       }
 
+      /* Results, validation output and format lists. These must be global:
+         the rows are created by page scripts, and Astro's scoped styles do not
+         reach elements added at runtime. */
+      .results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .results {
+        list-style: none;
+        padding: 0;
+        margin: 0.25rem 0 0;
+      }
+
+      .results li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.55rem 0;
+        border-bottom: 1px solid var(--border);
+        gap: 0.5rem;
+      }
+
+      .results li:last-child { border-bottom: none; }
+
+      .results code {
+        font-family: var(--mono);
+        font-size: 1rem;
+        letter-spacing: 0.05em;
+        user-select: all;
+      }
+
+      .validate-result {
+        margin: 0.75rem 0 0;
+        font-family: var(--mono);
+        font-size: 0.95rem;
+        min-height: 1.5em;
+      }
+
+      .validate-result.ok { color: var(--ok); }
+      .validate-result.err { color: var(--err); }
+
+      .checks {
+        list-style: none;
+        padding: 0;
+        margin: 0.5rem 0 0;
+      }
+
+      .checks .check {
+        font-size: 0.9rem;
+        padding: 0.2rem 0;
+        color: var(--muted);
+      }
+
+      .checks .check-ok { color: var(--ok); }
+      .checks .check-info { color: var(--muted); }
+      .checks .check-fail { color: var(--err); }
+
+      .formats {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .formats li {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        padding: 0.7rem 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .formats li:last-child { border-bottom: none; }
+
+      .formats-pattern {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .explain {
+        margin: 0 0 0.5rem;
+        font-size: 0.95rem;
+      }
+
+      .formats code {
+        font-family: var(--mono);
+        letter-spacing: 0.05em;
+        align-self: flex-start;
+      }
+
+      .section-note {
+        margin: 0 0 0.75rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
       .disclaimer {
         margin-top: 1rem;
         padding: 0.75rem 0.9rem;
@@ -459,9 +564,25 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
         .site-header {
           padding: 0.75rem 0.9rem;
         }
+        .site-header {
+          position: relative;
+        }
+        .site-header nav {
+          gap: 0.15rem;
+        }
+        /* Keep the theme toggle on the brand row so the links get a full row. */
+        .site-header .icon-btn {
+          position: absolute;
+          top: 0.45rem;
+          right: 0.9rem;
+        }
+        .segmented span {
+          padding: 0.5rem 0.7rem;
+          min-width: 0;
+        }
         .nav-link {
-          padding: 0.35rem 0.5rem;
-          font-size: 0.88rem;
+          padding: 0.3rem 0.4rem;
+          font-size: 0.84rem;
         }
       }
     </style>

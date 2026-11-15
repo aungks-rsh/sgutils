@@ -25,4 +25,9 @@ export const UTILITIES: Utility[] = [
     label: "UEN",
     tagline: "Generate and validate Singapore Unique Entity Numbers",
   },
+  {
+    slug: "/phone",
+    label: "Phone",
+    tagline: "Generate and validate Singapore phone numbers",
+  },
 ];

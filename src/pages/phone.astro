@@ -1,0 +1,305 @@
+---
+import Layout from "../components/Layout.astro";
+import { SITE } from "../config/site";
+import {
+  GENERATABLE_TYPES,
+  PHONE_FORMAT_LABELS,
+} from "../lib/phone";
+
+const title = "Singapore Phone Number Generator & Validator — sgutils";
+const description =
+  "Generate random Singapore phone numbers for testing — mobile, fixed line, VoIP and 1800 — and validate the format of any Singapore number, with or without +65. Runs entirely in your browser.";
+
+const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Singapore Phone Number Generator & Validator",
+  url: pageUrl,
+  description,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Any",
+  browserRequirements: "Requires JavaScript",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "SGD" },
+  publisher: { "@type": "Organization", name: SITE.name, url: SITE.url },
+  inLanguage: "en-SG",
+};
+
+// Short labels so the type selector stays on one line on a phone screen.
+const TYPE_SHORT_LABELS: Record<(typeof GENERATABLE_TYPES)[number], string> = {
+  mobile: "Mobile",
+  landline: "Landline",
+  voip: "VoIP",
+  tollfree: "1800",
+};
+
+const formatEntries = Object.entries(PHONE_FORMAT_LABELS);
+---
+
+<Layout title={title} description={description} jsonLd={jsonLd}>
+  <section class="hero">
+    <h1>Singapore Phone Number Generator &amp; Validator</h1>
+    <p class="lede">
+      Generate random Singapore phone numbers as test data, or check whether a
+      number follows the Singapore format. Useful for testing sign-up and
+      contact forms — all computation runs in your browser.
+    </p>
+  </section>
+
+  <section class="card" aria-labelledby="generate-heading">
+    <h2 id="generate-heading">Generate</h2>
+
+    <div class="field">
+      <span class="label">Type</span>
+      <div class="segmented" role="radiogroup" aria-label="Number type">
+        {GENERATABLE_TYPES.map((t) => (
+          <label>
+            <input type="radio" name="type" value={t} checked={t === "mobile"} />
+            <span>{TYPE_SHORT_LABELS[t]}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="format" class="label">Format</label>
+        <select id="format">
+          {formatEntries.map(([value, label]) => (
+            <option value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
+      <div class="field">
+        <label for="count" class="label">How many</label>
+        <select id="count">
+          <option selected>1</option>
+          <option>5</option>
+          <option>10</option>
+          <option>20</option>
+          <option>50</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="generate-btn" class="primary" type="button">Generate</button>
+
+    <div class="results-header" hidden>
+      <span id="results-count"></span>
+      <button id="copy-all" class="ghost" type="button">Copy all</button>
+    </div>
+    <ul id="results" class="results" aria-live="polite"></ul>
+
+    <p class="disclaimer">
+      For testing and development only. These numbers are random, so one can
+      <strong>belong to a real person</strong> — use them as form test data and
+      never call or message them. They cannot receive verification codes.
+    </p>
+  </section>
+
+  <section class="card" id="validate" aria-labelledby="validate-heading">
+    <h2 id="validate-heading">Validate</h2>
+    <p class="section-note">
+      Singapore phone number checker: confirms the length and number type.
+      Accepts spaces, hyphens and an optional +65.
+    </p>
+    <div class="row">
+      <div class="field grow">
+        <label for="validate-input" class="label">Phone number</label>
+        <input
+          id="validate-input"
+          type="text"
+          class="mono"
+          inputmode="tel"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="e.g. +65 9123 4567"
+          maxlength="24"
+        />
+      </div>
+      <div class="field">
+        <span class="label">&nbsp;</span>
+        <button id="validate-btn" class="primary" type="button">Check</button>
+      </div>
+    </div>
+    <p id="validate-summary" class="validate-result" aria-live="polite"></p>
+    <ul id="validate-checks" class="checks"></ul>
+  </section>
+
+  <section class="card" aria-labelledby="formats-heading">
+    <h2 id="formats-heading">Singapore phone number format</h2>
+    <p class="explain">
+      Singapore phone numbers have 8 digits and no area code. The country code
+      is +65, and the first digit shows the type of number.
+    </p>
+    <ul class="formats">
+      <li>
+        <strong>Mobile</strong>
+        <span class="formats-pattern">8 digits starting with 8 or 9 (never 99)</span>
+        <code>9123 4567</code>
+      </li>
+      <li>
+        <strong>Fixed line</strong>
+        <span class="formats-pattern">8 digits starting with 6</span>
+        <code>6123 4567</code>
+      </li>
+      <li>
+        <strong>IP telephony (VoIP)</strong>
+        <span class="formats-pattern">8 digits starting with 3</span>
+        <code>3123 4567</code>
+      </li>
+      <li>
+        <strong>Local toll-free</strong>
+        <span class="formats-pattern">1800 followed by 7 digits (11 digits)</span>
+        <code>1800 765 4321</code>
+      </li>
+      <li>
+        <strong>Premium rate</strong>
+        <span class="formats-pattern">1900 followed by 7 digits (11 digits)</span>
+        <code>1900 765 4321</code>
+      </li>
+      <li>
+        <strong>International toll-free</strong>
+        <span class="formats-pattern">800 followed by 7 digits (10 digits)</span>
+        <code>800 765 4321</code>
+      </li>
+      <li>
+        <strong>Emergency</strong>
+        <span class="formats-pattern">3 digits starting with 99</span>
+        <code>999</code>
+        <code>995</code>
+      </li>
+    </ul>
+    <p class="disclaimer">
+      Based on IMDA's
+      <a href="https://www.imda.gov.sg/-/media/imda/files/regulation-licensing-and-consultations/frameworks-and-policies/numbering/national-numbering-plan-and-allocation-process/imda-national-numbering-plan.pdf" rel="nofollow noopener" target="_blank">National Numbering Plan</a>
+      (Issue 2, February 2026). Numbers starting with 2, 4 or 5 are reserved
+      for future use. This tool checks <strong>format only</strong> — it cannot
+      tell whether a number is in service or who it belongs to.
+    </p>
+  </section>
+</Layout>
+
+<script>
+  import {
+    generateManyPhones,
+    validatePhone,
+    type GeneratableType,
+    type PhoneFormat,
+  } from "../lib/phone";
+
+  const typeRadios = document.querySelectorAll<HTMLInputElement>('input[name="type"]');
+  const formatSelect = document.getElementById("format") as HTMLSelectElement;
+  const countSelect = document.getElementById("count") as HTMLSelectElement;
+  const generateBtn = document.getElementById("generate-btn") as HTMLButtonElement;
+  const resultsList = document.getElementById("results") as HTMLUListElement;
+  const resultsHeader = document.querySelector(".results-header") as HTMLDivElement;
+  const resultsCountEl = document.getElementById("results-count") as HTMLSpanElement;
+  const copyAllBtn = document.getElementById("copy-all") as HTMLButtonElement;
+
+  const validateInput = document.getElementById("validate-input") as HTMLInputElement;
+  const validateBtn = document.getElementById("validate-btn") as HTMLButtonElement;
+  const validateSummary = document.getElementById("validate-summary") as HTMLParagraphElement;
+  const validateChecks = document.getElementById("validate-checks") as HTMLUListElement;
+
+  function currentType(): GeneratableType {
+    const checked = Array.from(typeRadios).find((r) => r.checked);
+    return (checked?.value as GeneratableType) ?? "mobile";
+  }
+
+  // 1800 numbers are not dialled with +65, so the +65 formats do not apply.
+  function syncFormatOptions() {
+    const tollfree = currentType() === "tollfree";
+    for (const option of Array.from(formatSelect.options)) {
+      const intl = option.value === "intl" || option.value === "e164";
+      option.disabled = tollfree && intl;
+    }
+    if (tollfree && formatSelect.selectedOptions[0]?.disabled) formatSelect.value = "spaced";
+  }
+
+  typeRadios.forEach((r) => r.addEventListener("change", syncFormatOptions));
+  syncFormatOptions();
+
+  async function copyText(text: string, btn: HTMLButtonElement) {
+    try {
+      await navigator.clipboard.writeText(text);
+      const prev = btn.textContent;
+      btn.textContent = "Copied";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = prev;
+        btn.classList.remove("copied");
+      }, 1200);
+    } catch {
+      btn.textContent = "Copy failed";
+    }
+  }
+
+  function renderResults(numbers: string[]) {
+    resultsList.innerHTML = "";
+    for (const number of numbers) {
+      const li = document.createElement("li");
+      const code = document.createElement("code");
+      code.textContent = number;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ghost";
+      btn.textContent = "Copy";
+      btn.addEventListener("click", () => copyText(number, btn));
+      li.append(code, btn);
+      resultsList.append(li);
+    }
+    resultsHeader.hidden = numbers.length === 0;
+    resultsCountEl.textContent =
+      numbers.length === 1 ? "1 result" : `${numbers.length} results`;
+  }
+
+  generateBtn.addEventListener("click", () => {
+    const count = Number.parseInt(countSelect.value, 10);
+    renderResults(
+      generateManyPhones(
+        { type: currentType(), format: formatSelect.value as PhoneFormat },
+        count,
+      ),
+    );
+  });
+
+  copyAllBtn.addEventListener("click", () => {
+    const text = Array.from(resultsList.querySelectorAll("code"))
+      .map((c) => c.textContent ?? "")
+      .join("\n");
+    if (text) copyText(text, copyAllBtn);
+  });
+
+  function runValidate() {
+    validateChecks.innerHTML = "";
+    const value = validateInput.value;
+    if (!value.trim()) {
+      validateSummary.textContent = "";
+      validateSummary.className = "validate-result";
+      return;
+    }
+    const result = validatePhone(value);
+    if (result.valid) {
+      const forms = result.e164 ? `${result.formatted} · ${result.e164}` : result.formatted;
+      validateSummary.textContent = `✓ Valid format — ${result.typeLabel} — ${forms}`;
+      validateSummary.className = "validate-result ok";
+    } else {
+      validateSummary.textContent = `✗ Invalid — ${result.reason}`;
+      validateSummary.className = "validate-result err";
+    }
+    for (const check of result.checks) {
+      const li = document.createElement("li");
+      li.className = `check check-${check.status}`;
+      const mark = check.status === "ok" ? "✓" : check.status === "fail" ? "✗" : "ⓘ";
+      li.textContent = `${mark} ${check.label}`;
+      validateChecks.append(li);
+    }
+  }
+
+  validateBtn.addEventListener("click", runValidate);
+  validateInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runValidate();
+  });
+</script>

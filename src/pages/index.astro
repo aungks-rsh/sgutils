@@ -3,16 +3,16 @@ import Layout from "../components/Layout.astro";
 import { PREFIX_DESCRIPTIONS } from "../lib/identifiers";
 import { SITE } from "../config/site";
 
-const title = "Singapore NRIC & FIN Generator — sgutils";
+const title = "Singapore NRIC & FIN Generator & Validator — sgutils";
 const description =
-  "Generate and validate format-valid Singapore NRIC and FIN numbers for testing and development. Free, privacy-friendly, runs entirely in your browser.";
+  "Singapore NRIC and FIN generator and checker: generate test numbers with a valid checksum, and validate the checksum letter of any NRIC or FIN. Free, runs entirely in your browser.";
 
 const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "Singapore NRIC & FIN Generator",
+  name: "Singapore NRIC & FIN Generator & Validator",
   url: pageUrl,
   description,
   applicationCategory: "DeveloperApplication",
@@ -26,10 +26,11 @@ const jsonLd = {
 
 <Layout title={title} description={description} jsonLd={jsonLd}>
   <section class="hero">
-    <h1>Singapore NRIC &amp; FIN Generator</h1>
+    <h1>Singapore NRIC &amp; FIN Generator &amp; Validator</h1>
     <p class="lede">
-      Generate format-valid test identifiers for development and QA. All
-      computation runs in your browser — nothing is sent anywhere.
+      Generate test NRIC and FIN numbers with a valid checksum, or check
+      whether an NRIC or FIN has the right checksum letter. For development and
+      QA — all computation runs in your browser, nothing is sent anywhere.
     </p>
   </section>
 
@@ -91,6 +92,10 @@ const jsonLd = {
 
   <section class="card" id="validate" aria-labelledby="validate-heading">
     <h2 id="validate-heading">Validate</h2>
+    <p class="section-note">
+      NRIC and FIN checker: confirms the format and the checksum letter for
+      prefixes S, T, F, G and M.
+    </p>
     <div class="row">
       <div class="field grow">
         <label for="validate-input" class="label">NRIC or FIN</label>
@@ -230,50 +235,3 @@ const jsonLd = {
     if (e.key === "Enter") runValidate();
   });
 </script>
-
-<style>
-  .results-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 1rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 0.88rem;
-  }
-
-  .results {
-    list-style: none;
-    padding: 0;
-    margin: 0.25rem 0 0;
-  }
-
-  .results li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.55rem 0;
-    border-bottom: 1px solid var(--border);
-    gap: 0.5rem;
-  }
-
-  .results li:last-child { border-bottom: none; }
-
-  .results code {
-    font-family: var(--mono);
-    font-size: 1rem;
-    letter-spacing: 0.05em;
-    user-select: all;
-  }
-
-  .validate-result {
-    margin: 0.75rem 0 0;
-    font-family: var(--mono);
-    font-size: 0.95rem;
-    min-height: 1.5em;
-  }
-
-  .validate-result.ok { color: var(--ok); }
-  .validate-result.err { color: var(--err); }
-</style>

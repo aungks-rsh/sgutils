@@ -131,6 +131,10 @@ const entityCodeEntries = Object.entries(ENTITY_TYPE_CODES);
 
   <section class="card" id="validate" aria-labelledby="validate-heading">
     <h2 id="validate-heading">Validate</h2>
+    <p class="section-note">
+      UEN checker: confirms the format and the check letter. It does not look
+      up whether the entity is registered.
+    </p>
     <div class="row">
       <div class="field grow">
         <label for="validate-input" class="label">UEN</label>
@@ -361,98 +365,5 @@ const entityCodeEntries = Object.entries(ENTITY_TYPE_CODES);
   .hint {
     color: var(--muted);
     font-weight: 400;
-  }
-
-  .results-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 1rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 0.88rem;
-  }
-
-  .results {
-    list-style: none;
-    padding: 0;
-    margin: 0.25rem 0 0;
-  }
-
-  .results li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.55rem 0;
-    border-bottom: 1px solid var(--border);
-    gap: 0.5rem;
-  }
-
-  .results li:last-child { border-bottom: none; }
-
-  .results code {
-    font-family: var(--mono);
-    font-size: 1rem;
-    letter-spacing: 0.05em;
-    user-select: all;
-  }
-
-  .validate-result {
-    margin: 0.75rem 0 0;
-    font-family: var(--mono);
-    font-size: 0.95rem;
-    min-height: 1.5em;
-  }
-
-  .validate-result.ok { color: var(--ok); }
-  .validate-result.err { color: var(--err); }
-
-  .checks {
-    list-style: none;
-    padding: 0;
-    margin: 0.5rem 0 0;
-  }
-
-  .checks .check {
-    font-size: 0.9rem;
-    padding: 0.2rem 0;
-    color: var(--muted);
-  }
-
-  .checks .check-ok { color: var(--ok); }
-  .checks .check-info { color: var(--muted); }
-  .checks .check-fail { color: var(--err); }
-
-  .formats {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .formats li {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    padding: 0.7rem 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .formats li:last-child { border-bottom: none; }
-
-  .formats-pattern {
-    color: var(--muted);
-    font-size: 0.88rem;
-  }
-
-  .explain {
-    margin: 0 0 0.5rem;
-    font-size: 0.95rem;
-  }
-
-  .formats code {
-    font-family: var(--mono);
-    letter-spacing: 0.05em;
-    align-self: flex-start;
   }
 </style>

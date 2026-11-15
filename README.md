@@ -12,6 +12,7 @@ Everything runs in the browser. There is no backend, no signup, and nothing you 
 | Date / Time | [/datetime/](https://sgutils.com/datetime/) | Converts between Unix timestamps, UTC, Singapore time and your local time. |
 | HDB Cost | [/hdb/](https://sgutils.com/hdb/) | Estimates the upfront cash and CPF needed for an HDB resale flat, with HDB-loan and bank-loan options and monthly repayment. |
 | UEN | [/uen/](https://sgutils.com/uen/) | Generates and validates Unique Entity Numbers in all three formats, including the check letter. |
+| Phone | [/phone/](https://sgutils.com/phone/) | Generates random Singapore phone numbers (mobile, fixed line, VoIP, 1800) and validates a number's format, with or without +65. |
 
 Generated identifiers are for testing and development only. They are not real identities or entities, although a generated number can coincide with a real one.
 
@@ -19,6 +20,7 @@ Generated identifiers are for testing and development only. They are not real id
 
 - **NRIC / FIN:** the checksum for S, T, F and G is widely documented. The M-series (2022 onwards) is implemented the way public implementations agree on; ICA has not published it.
 - **UEN:** ACRA does not publish the check-letter algorithm. The formulas used here are the community ones, and they matched every one of about 28,000 real UENs sampled from ACRA's open dataset on [data.gov.sg](https://data.gov.sg). A correct check letter does not mean an entity is registered.
+- **Phone numbers:** format only, following IMDA's National Numbering Plan (Issue 2, February 2026). There is no checksum and no range reserved for fictional numbers, so a generated number can be in real use.
 - **HDB calculator:** an estimate based on the rules at the time it was written. Rates, caps and stamp duty change, so check HDB, CPF Board, MAS and IRAS before relying on a figure.
 
 ## Development
