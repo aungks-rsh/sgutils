@@ -6,9 +6,11 @@ interface Props {
   title: string;
   description: string;
   jsonLd?: Record<string, unknown>;
+  /** Ask search engines not to index this page (e.g. the 404 page). */
+  noindex?: boolean;
 }
 
-const { title, description, jsonLd } = Astro.props;
+const { title, description, jsonLd, noindex = false } = Astro.props;
 
 const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
 const ogImage = new URL("/og.png", SITE.url).toString();
@@ -22,7 +24,11 @@ const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={pageUrl} />
+    {noindex ? (
+      <meta name="robots" content="noindex" />
+    ) : (
+      <link rel="canonical" href={pageUrl} />
+    )}
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={SITE.name} />

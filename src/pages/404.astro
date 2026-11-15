@@ -1,0 +1,56 @@
+---
+import Layout from "../components/Layout.astro";
+import { UTILITIES } from "../config/utilities";
+
+const title = "Page not found — sgutils";
+const description = "This page does not exist. Pick one of the sgutils tools instead.";
+---
+
+<Layout title={title} description={description} noindex>
+  <section class="hero">
+    <h1>Page not found</h1>
+    <p class="lede">
+      There is nothing at this address. It may have been mistyped, or the page
+      may have moved. These are the tools on sgutils:
+    </p>
+  </section>
+
+  <section class="card" aria-labelledby="tools-heading">
+    <h2 id="tools-heading">Tools</h2>
+    <ul class="tools">
+      {UTILITIES.map((u) => (
+        <li>
+          <a href={u.slug}>{u.label}</a>
+          <span>{u.tagline}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Layout>
+
+<style>
+  .tools {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .tools li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tools li:last-child { border-bottom: none; }
+
+  .tools a {
+    font-weight: 600;
+  }
+
+  .tools span {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+</style>
