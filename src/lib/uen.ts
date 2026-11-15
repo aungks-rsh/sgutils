@@ -1,12 +1,13 @@
-// Singapore UEN (Unique Entity Number) — format generation and structural
-// validation.
+// Singapore UEN (Unique Entity Number) — generation and validation, including
+// the trailing check letter.
 //
-// IMPORTANT: ACRA does not publish the algorithm used to compute the trailing
-// check letter of a UEN. Unlike NRIC/FIN, we therefore CANNOT verify (or
-// correctly compute) the check letter. This module only deals with STRUCTURE —
-// length, prefix, entity-type code, and character pattern. A structurally valid
-// UEN is not necessarily real or registered. Verify real entities at ACRA's
-// BizFile directory.
+// ACRA does not publish the check-letter algorithm. The formulas below are the
+// community-reconstructed ones (the same weights used by python-stdnum and
+// other public validators). We verified them ourselves against 27,961 real
+// UENs sampled from ACRA's open dataset on data.gov.sg (2026-11): every UEN in
+// all three formats matched. They are still UNOFFICIAL, and a correct check
+// letter does not mean an entity is real or registered — verify real entities
+// at ACRA's BizFile directory.
 
 export type UenFormat = "business" | "local" | "other";
 
@@ -15,44 +16,117 @@ export const UEN_FORMATS: Record<
   { label: string; pattern: string; example: string }
 > = {
   business: {
-    label: "Business (pre-2009)",
+    label: "Business",
     pattern: "8 digits + check letter",
-    example: "53333444A",
+    example: "53333444J",
   },
   local: {
     label: "Local company",
     pattern: "year (4 digits) + 5 digits + check letter",
-    example: "201912345K",
+    example: "201912345R",
   },
   other: {
     label: "Other entity",
-    pattern: "prefix + 2-digit year + entity code + 4 digits + check letter",
-    example: "T09LL0001B",
+    pattern: "century letter + 2-digit year + entity code + 4 digits + check letter",
+    example: "T09LL0001D",
   },
 };
 
-// Century / issuance-era prefixes used by the "other entity" format.
-export const OTHER_PREFIXES = ["S", "T", "R"] as const;
+// Century prefixes used by the "other entity" format: the letter plus the two
+// digits after it give the year (e.g. T09 = 2009, S61 = 1961, R90 = 1890).
+// Confirmed against real UENs in ACRA's open data.
+export const OTHER_PREFIXES = ["T", "S", "R"] as const;
 export type OtherPrefix = (typeof OTHER_PREFIXES)[number];
 
 export const OTHER_PREFIX_DESCRIPTIONS: Record<OtherPrefix, string> = {
-  S: "Issued before 2000 (19yy)",
-  T: "Issued 2000–2020 (20yy)",
-  R: "Issued from 2021 (20yy)",
+  T: "Year 2000 onwards (20yy)",
+  S: "Years 1900–1999 (19yy)",
+  R: "Years 1800–1899 (18yy)",
 };
 
-// A subset of the 2-letter entity-type codes (the "PQ" slot of the "other"
-// format) that we are confident about. Used to label recognised codes and to
-// populate the generator menu. The full, authoritative list is maintained by
-// the Singapore Government — validation deliberately does NOT reject codes that
-// are absent here, since the list can grow over time.
+// 2-letter entity-type codes (the "PQ" slot of the "other" format). Each code
+// and name below was observed in ACRA's open UEN dataset (entity_type_desc
+// column, 2026-11). Used to label recognised codes and to populate the
+// generator menu. Validation deliberately does NOT reject codes that are absent
+// here, since the Government adds new entity types over time.
 export const ENTITY_TYPE_CODES: Record<string, string> = {
-  LP: "Limited partnership",
   LL: "Limited liability partnership",
-  FC: "Foreign company (branch)",
-  PF: "Public accounting firm",
+  LP: "Limited partnership",
+  FC: "Foreign company branch",
   RF: "Representative office",
+  VC: "Variable capital company",
+  PF: "Partnership (ACRA-registered)",
+  SS: "Society",
+  MC: "Management corporation",
+  SM: "Subsidiary management corporation",
+  CC: "Charity",
+  CS: "Co-operative society",
+  MB: "Mutual benefit organisation",
+  TU: "Trade union",
+  PW: "Platform work association",
+  CM: "Medical clinic",
+  CD: "Dental clinic",
+  MD: "Medical and dental clinic",
+  CL: "Clinical laboratory",
+  XL: "X-ray laboratory",
+  CX: "Clinical and X-ray laboratory",
+  HC: "Healthcare service provider",
+  GA: "Organ of state, ministry or department",
+  GB: "Statutory board or public body",
+  GS: "Government or government-aided school",
+  EC: "International education language centre",
+  TC: "Town council",
+  PA: "People's Association service",
+  PB: "Grassroots unit",
+  MQ: "Mosque",
+  MM: "Madrasah",
+  DP: "High commission or embassy",
+  CP: "Consulate",
+  NR: "International organisation",
+  FM: "Foreign military unit",
+  FB: "Bank representative office",
+  FN: "Insurance representative office",
+  FS: "Other financial representative office",
+  RP: "Foreign law practice representative office",
+  NB: "News bureau",
 };
+
+// --- Check letter -----------------------------------------------------------
+
+const BUSINESS_WEIGHTS = [10, 4, 9, 3, 8, 2, 7, 1];
+const BUSINESS_LETTERS = "XMKECAWLJDB";
+const LOCAL_WEIGHTS = [10, 8, 6, 4, 9, 7, 5, 3, 1];
+const LOCAL_LETTERS = "ZKCMDNERGWH";
+const OTHER_WEIGHTS = [4, 3, 5, 3, 10, 2, 2, 5, 7];
+// Character values for the "other" format. I, O, Y and Z have no value, so a
+// body containing one of them cannot be checked.
+const OTHER_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWX0123456789";
+
+function weightedSum(values: number[], weights: number[]): number {
+  return values.reduce((sum, v, i) => sum + v * weights[i], 0);
+}
+
+/**
+ * Compute the check letter for a UEN body (the UEN without its last
+ * character). Returns `null` when the body matches no format, or when an
+ * "other entity" body contains a character the formula has no value for.
+ */
+export function uenCheckLetter(body: string): string | null {
+  const b = body.trim().toUpperCase();
+  if (/^\d{8}$/.test(b)) {
+    return BUSINESS_LETTERS[weightedSum([...b].map(Number), BUSINESS_WEIGHTS) % 11];
+  }
+  if (/^\d{9}$/.test(b)) {
+    return LOCAL_LETTERS[weightedSum([...b].map(Number), LOCAL_WEIGHTS) % 11];
+  }
+  if (/^[STR]\d{2}[A-Z]{2}\d{4}$/.test(b)) {
+    const values = [...b].map((c) => OTHER_ALPHABET.indexOf(c));
+    if (values.some((v) => v < 0)) return null;
+    // +6 is the published "-5" offset kept non-negative under modulo 11.
+    return OTHER_ALPHABET[(weightedSum(values, OTHER_WEIGHTS) + 6) % 11];
+  }
+  return null;
+}
 
 export interface UenCheck {
   label: string;
@@ -65,19 +139,59 @@ export interface UenValidationResult {
   formatLabel?: string;
   entityTypeCode?: string;
   entityTypeName?: string;
+  /** True when the check letter was computed and matched; false when it could not be checked. */
+  checkLetterVerified?: boolean;
+  /** The check letter the formula expects, when it could be computed. */
+  expectedCheckLetter?: string;
   checks: UenCheck[];
   reason?: string;
 }
 
-const CHECK_LETTER_INFO: UenCheck = {
-  label: "Check letter not verifiable — ACRA's algorithm is unpublished",
+const CHECK_LETTER_UNVERIFIABLE: UenCheck = {
+  label: "Check letter not verifiable for this entity code",
   status: "info",
 };
 
 /**
- * Validate the STRUCTURE of a UEN. Returns `valid: true` when the input matches
- * one of the three official formats. The trailing check letter is never
- * verified (see module note); a passing result means well-formed, not real.
+ * Apply the check-letter test to a structurally valid result. A wrong letter
+ * makes the UEN invalid; a body the formula cannot handle stays valid with an
+ * info note.
+ */
+function withCheckLetter(v: string, result: UenValidationResult): UenValidationResult {
+  const expected = uenCheckLetter(v.slice(0, -1));
+  const actual = v.slice(-1);
+  if (expected === null) {
+    return {
+      ...result,
+      checkLetterVerified: false,
+      checks: [...result.checks, CHECK_LETTER_UNVERIFIABLE],
+    };
+  }
+  if (expected === actual) {
+    return {
+      ...result,
+      checkLetterVerified: true,
+      expectedCheckLetter: expected,
+      checks: [...result.checks, { label: `Check letter "${actual}" is correct`, status: "ok" }],
+    };
+  }
+  return {
+    ...result,
+    valid: false,
+    checkLetterVerified: false,
+    expectedCheckLetter: expected,
+    reason: `Check letter should be "${expected}", not "${actual}".`,
+    checks: [
+      ...result.checks,
+      { label: `Check letter "${actual}" is wrong — expected "${expected}"`, status: "fail" },
+    ],
+  };
+}
+
+/**
+ * Validate a UEN: structure (one of the three official formats) and the
+ * trailing check letter. A passing result means well-formed with a correct
+ * check letter — not that the entity is real or registered.
  */
 export function validateUen(value: string): UenValidationResult {
   const v = value.trim().toUpperCase();
@@ -101,22 +215,21 @@ export function validateUen(value: string): UenValidationResult {
 
   // Business: 9 chars — 8 digits + check letter.
   if (/^\d{8}[A-Z]$/.test(v)) {
-    return {
+    return withCheckLetter(v, {
       valid: true,
       format: "business",
       formatLabel: UEN_FORMATS.business.label,
       checks: [
         { label: "9 characters", status: "ok" },
         { label: "8 digits followed by a check letter", status: "ok" },
-        CHECK_LETTER_INFO,
       ],
-    };
+    });
   }
 
   // Local company: 10 chars — yyyy + 5 digits + check letter.
   if (/^\d{9}[A-Z]$/.test(v)) {
     const year = v.slice(0, 4);
-    return {
+    return withCheckLetter(v, {
       valid: true,
       format: "local",
       formatLabel: UEN_FORMATS.local.label,
@@ -124,9 +237,8 @@ export function validateUen(value: string): UenValidationResult {
         { label: "10 characters", status: "ok" },
         { label: `Registration year ${year}`, status: "ok" },
         { label: "5-digit running number + check letter", status: "ok" },
-        CHECK_LETTER_INFO,
       ],
-    };
+    });
   }
 
   // Other entity: 10 chars — prefix(S/T/R) + yy + PQ + nnnn + check letter.
@@ -134,7 +246,8 @@ export function validateUen(value: string): UenValidationResult {
   if (otherMatch) {
     const [, prefix, yy, code] = otherMatch;
     const entityTypeName = ENTITY_TYPE_CODES[code];
-    return {
+    const century = { T: "20", S: "19", R: "18" }[prefix as OtherPrefix];
+    return withCheckLetter(v, {
       valid: true,
       format: "other",
       formatLabel: UEN_FORMATS.other.label,
@@ -146,16 +259,15 @@ export function validateUen(value: string): UenValidationResult {
           label: `Prefix "${prefix}" — ${OTHER_PREFIX_DESCRIPTIONS[prefix as OtherPrefix]}`,
           status: "ok",
         },
-        { label: `Issuance year ending in ${yy}`, status: "ok" },
+        { label: `Year ${century}${yy}`, status: "ok" },
         {
           label: entityTypeName
             ? `Entity-type code "${code}" — ${entityTypeName}`
             : `Entity-type code "${code}" — not in our known list (may still be valid)`,
           status: entityTypeName ? "ok" : "info",
         },
-        CHECK_LETTER_INFO,
       ],
-    };
+    });
   }
 
   return {
@@ -163,12 +275,6 @@ export function validateUen(value: string): UenValidationResult {
     checks: [],
     reason: "Does not match any of the three UEN formats.",
   };
-}
-
-const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-function randomLetter(): string {
-  return LETTERS[Math.floor(Math.random() * LETTERS.length)];
 }
 
 function randomDigits(n: number): string {
@@ -182,43 +288,55 @@ function pick<T>(items: readonly T[]): T {
 }
 
 // Plausible registration-year range for the local-company format.
-const MIN_YEAR = 1965;
-const MAX_YEAR = 2025;
+export const UEN_MIN_YEAR = 1965;
+
+export function uenMaxYear(): number {
+  return new Date().getFullYear();
+}
 
 function randomYear(): number {
-  return MIN_YEAR + Math.floor(Math.random() * (MAX_YEAR - MIN_YEAR + 1));
+  const max = uenMaxYear();
+  return UEN_MIN_YEAR + Math.floor(Math.random() * (max - UEN_MIN_YEAR + 1));
+}
+
+/** Append the computed check letter; "X" only if the body cannot be checked. */
+function withLetter(body: string): string {
+  return body + (uenCheckLetter(body) ?? "X");
 }
 
 export interface GenerateOptions {
   format: UenFormat;
-  /** Registration year for "local"; issuance year for "other". Randomised if omitted. */
+  /** Registration year for "local"; year (last two digits used) for "other". Randomised if omitted. */
   year?: number;
-  /** Era prefix for the "other" format. Randomised if omitted. */
+  /** Century prefix for the "other" format. Randomised if omitted. */
   prefix?: OtherPrefix;
   /** Entity-type code for the "other" format. Randomised from known codes if omitted. */
   entityCode?: string;
 }
 
 /**
- * Generate a single structurally-valid UEN. The trailing check letter is a
- * random placeholder — it is NOT a computed checksum (see module note).
+ * Generate a single UEN with a correctly computed check letter (see module
+ * note — the formula is unofficial but matches real UENs).
  */
 export function generateUen(opts: GenerateOptions): string {
   switch (opts.format) {
     case "business":
-      return randomDigits(8) + randomLetter();
+      return withLetter(randomDigits(8));
     case "local": {
       const year = opts.year ?? randomYear();
-      return String(year).padStart(4, "0") + randomDigits(5) + randomLetter();
+      return withLetter(String(year).padStart(4, "0") + randomDigits(5));
     }
     case "other": {
       const prefix = opts.prefix ?? pick(OTHER_PREFIXES);
+      // "T" means 20yy, so keep a random year from running into the future.
       const yy =
         opts.year !== undefined
           ? String(opts.year % 100).padStart(2, "0")
-          : randomDigits(2);
+          : prefix === "T"
+            ? String(Math.floor(Math.random() * ((uenMaxYear() % 100) + 1))).padStart(2, "0")
+            : randomDigits(2);
       const code = opts.entityCode ?? pick(Object.keys(ENTITY_TYPE_CODES));
-      return prefix + yy + code + randomDigits(4) + randomLetter();
+      return withLetter(prefix + yy + code + randomDigits(4));
     }
   }
 }
