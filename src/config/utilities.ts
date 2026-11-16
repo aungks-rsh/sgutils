@@ -30,4 +30,9 @@ export const UTILITIES: Utility[] = [
     label: "Phone",
     tagline: "Generate and validate Singapore phone numbers",
   },
+  {
+    slug: "/car-plate",
+    label: "Car Plate",
+    tagline: "Check and generate Singapore vehicle plate numbers",
+  },
 ];

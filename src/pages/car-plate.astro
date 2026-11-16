@@ -1,0 +1,276 @@
+---
+import Layout from "../components/Layout.astro";
+import { SITE } from "../config/site";
+import {
+  GENERATABLE_PLATE_TYPES,
+  PLATE_FORMAT_LABELS,
+  PLATE_TYPE_LABELS,
+} from "../lib/plate";
+
+const title = "Singapore Car Plate Checker & Generator — Checksum Letter — sgutils";
+const description =
+  "Singapore car plate checker and generator: check the checksum letter of any vehicle registration number, find the missing last letter, or generate test plates for cars, motorcycles, goods vehicles, buses and taxis. Runs entirely in your browser.";
+
+const pageUrl = new URL(Astro.url.pathname, SITE.url).toString();
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Singapore Car Plate Checker & Generator",
+  url: pageUrl,
+  description,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Any",
+  browserRequirements: "Requires JavaScript",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "SGD" },
+  publisher: { "@type": "Organization", name: SITE.name, url: SITE.url },
+  inLanguage: "en-SG",
+};
+
+const formatEntries = Object.entries(PLATE_FORMAT_LABELS);
+---
+
+<Layout title={title} description={description} jsonLd={jsonLd}>
+  <section class="hero">
+    <h1>Singapore Car Plate Checker &amp; Generator</h1>
+    <p class="lede">
+      Check the checksum letter of a Singapore vehicle registration number, or
+      generate plates with a correct checksum letter as test data. For
+      development and QA — all computation runs in your browser.
+    </p>
+  </section>
+
+  <section class="card" id="validate" aria-labelledby="validate-heading">
+    <h2 id="validate-heading">Check</h2>
+    <p class="section-note">
+      Car plate checker: confirms the format and the last (checksum) letter.
+      Leave the last letter off to find out what it should be.
+    </p>
+    <div class="row">
+      <div class="field grow">
+        <label for="validate-input" class="label">Plate number</label>
+        <input
+          id="validate-input"
+          type="text"
+          class="mono upper"
+          inputmode="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="e.g. SBA 1234 G"
+          maxlength="12"
+        />
+      </div>
+      <div class="field">
+        <span class="label">&nbsp;</span>
+        <button id="validate-btn" class="primary" type="button">Check</button>
+      </div>
+    </div>
+    <p id="validate-summary" class="validate-result" aria-live="polite"></p>
+    <ul id="validate-checks" class="checks"></ul>
+  </section>
+
+  <section class="card" aria-labelledby="generate-heading">
+    <h2 id="generate-heading">Generate</h2>
+
+    <div class="field">
+      <label for="type" class="label">Vehicle type</label>
+      <select id="type">
+        {GENERATABLE_PLATE_TYPES.map((t) => (
+          <option value={t}>{PLATE_TYPE_LABELS[t]}</option>
+        ))}
+      </select>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="format" class="label">Format</label>
+        <select id="format">
+          {formatEntries.map(([value, label]) => (
+            <option value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
+      <div class="field">
+        <label for="count" class="label">How many</label>
+        <select id="count">
+          <option selected>1</option>
+          <option>5</option>
+          <option>10</option>
+          <option>20</option>
+          <option>50</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="generate-btn" class="primary" type="button">Generate</button>
+
+    <div class="results-header" hidden>
+      <span id="results-count"></span>
+      <button id="copy-all" class="ghost" type="button">Copy all</button>
+    </div>
+    <ul id="results" class="results" aria-live="polite"></ul>
+
+    <p class="disclaimer">
+      For testing and development only. These plates are random, so one can
+      <strong>match a real vehicle</strong>. Use them as form test data, and
+      never display one on a vehicle or use it to identify anyone.
+    </p>
+  </section>
+
+  <section class="card" aria-labelledby="how-heading">
+    <h2 id="how-heading">How the car plate checksum letter works</h2>
+    <p class="explain">
+      A Singapore plate such as <code>SBA 1234 G</code> has a prefix of 1 to 3
+      letters, a number from 1 to 9999, and a final checksum letter worked out
+      from the rest.
+    </p>
+    <ul class="formats">
+      <li>
+        <strong>1. Letters</strong>
+        <span class="formats-pattern">
+          Take the last two prefix letters as numbers (A=1 … Z=26). A
+          one-letter prefix counts as 0 and that letter.
+        </span>
+        <code>BA → 2, 1</code>
+      </li>
+      <li>
+        <strong>2. Digits</strong>
+        <span class="formats-pattern">Pad the number to four digits.</span>
+        <code>1234 → 1, 2, 3, 4</code>
+      </li>
+      <li>
+        <strong>3. Weights</strong>
+        <span class="formats-pattern">
+          Multiply the six values by 9, 4, 5, 4, 3, 2 and add them up.
+        </span>
+        <code>18+4+5+8+9+8 = 52</code>
+      </li>
+      <li>
+        <strong>4. Letter</strong>
+        <span class="formats-pattern">
+          Divide by 19; the remainder picks a letter from
+          A Z Y X U T S R P M L K J H G E D C B (remainder 0 is A).
+        </span>
+        <code>52 mod 19 = 14 → G</code>
+      </li>
+    </ul>
+    <p class="explain">
+      The letters F, I, N, O, Q, V and W are never checksum letters. Common
+      prefixes: S for cars, SH for taxis, F for motorcycles, G for light goods
+      vehicles, Y and X for heavy vehicles, P for private buses, and SBS, SMB
+      and SG for public buses.
+    </p>
+    <p class="disclaimer">
+      LTA does not publish the formula. This is the widely documented one, and
+      it matched the real plates we tested it on (about 700, mostly public
+      buses). The tool checks the <strong>checksum only</strong> — it cannot
+      tell whether a plate is registered, who owns the vehicle, or its road tax
+      or COE status. Some plates, such as military (MID) and certain government
+      plates, have no checksum letter.
+    </p>
+  </section>
+</Layout>
+
+<script>
+  import {
+    generateManyPlates,
+    validatePlate,
+    type PlateFormat,
+    type PlateType,
+  } from "../lib/plate";
+
+  const typeSelect = document.getElementById("type") as HTMLSelectElement;
+  const formatSelect = document.getElementById("format") as HTMLSelectElement;
+  const countSelect = document.getElementById("count") as HTMLSelectElement;
+  const generateBtn = document.getElementById("generate-btn") as HTMLButtonElement;
+  const resultsList = document.getElementById("results") as HTMLUListElement;
+  const resultsHeader = document.querySelector(".results-header") as HTMLDivElement;
+  const resultsCountEl = document.getElementById("results-count") as HTMLSpanElement;
+  const copyAllBtn = document.getElementById("copy-all") as HTMLButtonElement;
+
+  const validateInput = document.getElementById("validate-input") as HTMLInputElement;
+  const validateBtn = document.getElementById("validate-btn") as HTMLButtonElement;
+  const validateSummary = document.getElementById("validate-summary") as HTMLParagraphElement;
+  const validateChecks = document.getElementById("validate-checks") as HTMLUListElement;
+
+  async function copyText(text: string, btn: HTMLButtonElement) {
+    try {
+      await navigator.clipboard.writeText(text);
+      const prev = btn.textContent;
+      btn.textContent = "Copied";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = prev;
+        btn.classList.remove("copied");
+      }, 1200);
+    } catch {
+      btn.textContent = "Copy failed";
+    }
+  }
+
+  function renderResults(plates: string[]) {
+    resultsList.innerHTML = "";
+    for (const plate of plates) {
+      const li = document.createElement("li");
+      const code = document.createElement("code");
+      code.textContent = plate;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ghost";
+      btn.textContent = "Copy";
+      btn.addEventListener("click", () => copyText(plate, btn));
+      li.append(code, btn);
+      resultsList.append(li);
+    }
+    resultsHeader.hidden = plates.length === 0;
+    resultsCountEl.textContent = plates.length === 1 ? "1 result" : `${plates.length} results`;
+  }
+
+  generateBtn.addEventListener("click", () => {
+    const count = Number.parseInt(countSelect.value, 10);
+    renderResults(
+      generateManyPlates(
+        { type: typeSelect.value as PlateType, format: formatSelect.value as PlateFormat },
+        count,
+      ),
+    );
+  });
+
+  copyAllBtn.addEventListener("click", () => {
+    const text = Array.from(resultsList.querySelectorAll("code"))
+      .map((c) => c.textContent ?? "")
+      .join("\n");
+    if (text) copyText(text, copyAllBtn);
+  });
+
+  function runValidate() {
+    validateChecks.innerHTML = "";
+    const value = validateInput.value;
+    if (!value.trim()) {
+      validateSummary.textContent = "";
+      validateSummary.className = "validate-result";
+      return;
+    }
+    const result = validatePlate(value);
+    if (result.valid) {
+      const kind = result.category ? ` — ${result.category}` : "";
+      validateSummary.textContent = `✓ Valid — ${result.formatted}${kind}`;
+      validateSummary.className = "validate-result ok";
+    } else {
+      validateSummary.textContent = `✗ Invalid — ${result.reason}`;
+      validateSummary.className = "validate-result err";
+    }
+    for (const check of result.checks) {
+      const li = document.createElement("li");
+      li.className = `check check-${check.status}`;
+      const mark = check.status === "ok" ? "✓" : check.status === "fail" ? "✗" : "ⓘ";
+      li.textContent = `${mark} ${check.label}`;
+      validateChecks.append(li);
+    }
+  }
+
+  validateBtn.addEventListener("click", runValidate);
+  validateInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runValidate();
+  });
+</script>
